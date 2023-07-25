@@ -131,6 +131,10 @@ export const getFairValue = async (token, providerOrSigner) => {
   return BigInt(response.toTokenAmount);
 };
 
+export const toHex = (n: number) => {
+  return Number(n).toFixed(0);
+};
+
 export const postSpread = async (
   { getsToken, givesToken },
   tolerance,
@@ -176,14 +180,15 @@ export const postSpread = async (
     .map((v, i) => {
       return {
         givesToken,
-        givesAmount: v * Number(givesTokenBalance),
+        givesAmount: toHex(v * Number(givesTokenBalance)),
         getsToken,
-        getsAmount:
+        getsAmount: toHex(
           (v *
             Number(givesTokenBalance) *
             priceMultipliers[i] *
             Number(givesTokenPrice)) /
-          Number(getsTokenPrice),
+            Number(getsTokenPrice)
+        ),
       };
     });
   logger.info("posting spread --");

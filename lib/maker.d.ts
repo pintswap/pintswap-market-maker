@@ -14,6 +14,7 @@ export declare const clearOrderbookForPair: ({ tokenA: getsToken, tokenB: givesT
 }) => Promise<void>;
 export declare const toProvider: (providerOrSigner: any) => any;
 export declare const getFairValue: (token: any, providerOrSigner: any) => Promise<bigint>;
+export declare const toHex: (n: number) => string;
 export declare const postSpread: ({ getsToken, givesToken }: {
     getsToken: any;
     givesToken: any;
