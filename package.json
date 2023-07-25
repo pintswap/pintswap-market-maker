@@ -1,5 +1,5 @@
 {
-  "name": "pintswap-daemon",
+  "name": "pintswap-market-maker",
   "version": "0.1.0",
   "description": "PintSwap daemon process ",
   "main": "lib/index.js",

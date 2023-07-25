@@ -83,8 +83,8 @@ export const clearOrderbookForPair = async ({
   const filtered = offerList
     .filter(
       (v) =>
-        (v.gets.token === gets && v.gives.token === gives) ||
-        (v.gives.token === gets && v.gets.token === gives)
+        (v.gets.token.toLowerCase() === gets && v.gives.token.toLowerCase() === gives) ||
+        (v.gives.token.toLowerCase() === gets && v.gets.token.toLowerCase() === gives)
     )
     .map((v) => v.id);
   for (const id of filtered) {
@@ -132,7 +132,7 @@ export const getFairValue = async (token, providerOrSigner) => {
 };
 
 export const toHex = (n: number) => {
-  return Number(n).toFixed(0);
+  return ethers.toBeHex(ethers.getUint(Number(n).toFixed(0)));
 };
 
 export const postSpread = async (
@@ -151,7 +151,7 @@ export const postSpread = async (
           coerceToWeth(v),
           ["function decimals() view returns (uint8)"],
           signer
-        )
+        ).decimals()
     )
   );
   const givesTokenBalance =
@@ -166,6 +166,8 @@ export const postSpread = async (
     .fill(0)
     .map((_, i) => 1 + i * (Number(tolerance) / Number(nOffers)))
     .slice(1);
+    console.log(givesTokenDecimals);
+    console.log(getsTokenDecimals);
   const offersToInsert = priceMultipliers
     .map((v) => Math.pow(v - 1, 2))
     .map(
@@ -186,13 +188,14 @@ export const postSpread = async (
           (v *
             Number(givesTokenBalance) *
             priceMultipliers[i] *
-            Number(givesTokenPrice)) /
-            Number(getsTokenPrice)
+            Number(givesTokenPrice))*Math.pow(10, Number(getsTokenDecimals)) /
+            (Math.pow(10, Number(givesTokenDecimals))*Number(getsTokenPrice))
         ),
       };
     });
   logger.info("posting spread --");
   for (const item of offersToInsert) {
+    logger.info(item);
     await add(item);
   }
   logger.info("spread posted!");
