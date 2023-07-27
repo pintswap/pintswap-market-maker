@@ -13,6 +13,8 @@ export declare const clearOrderbookForPair: ({ tokenA: getsToken, tokenB: givesT
     tokenB: any;
 }) => Promise<void>;
 export declare const toProvider: (providerOrSigner: any) => any;
+export declare const proxyFetch: (uri: any, config?: any) => Promise<any>;
+export declare const ln: (v: any) => any;
 export declare const getFairValue: (token: any, providerOrSigner: any) => Promise<bigint>;
 export declare const toHex: (n: number) => string;
 export declare const postSpread: ({ getsToken, givesToken }: {

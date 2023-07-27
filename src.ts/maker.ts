@@ -4,6 +4,9 @@ import url from "url";
 import { getLogger } from "./logger";
 import { toWETH } from "@pintswap/sdk/lib/trade";
 import qs from "querystring";
+import { HttpProxyAgent } from "http-proxy-agent";
+import { ChainId, Token, WETH, Fetcher, Route } from "@uniswap/sdk";
+
 const fetch = (global as any).fetch;
 
 const logger = getLogger();
@@ -11,8 +14,13 @@ const logger = getLogger();
 const PORT = process.env.PINTSWAP_DAEMON_PORT || 42161;
 const HOST = process.env.PINTSWAP_DAEMON_HOST || "127.0.0.1";
 
-const coerceToWeth = (address) => {
-  if (address === ethers.ZeroAddress) return toWETH(1);
+const agent = process.env.PINTSWAP_MARKET_MAKER_PROXY ? new HttpProxyAgent(process.env.PINTSWAP_MARKET_MAKER_PROXY) : null;
+
+const coerceToWeth = async (address, providerOrSigner) => {
+  if (address === ethers.ZeroAddress) {
+    const { chainId } = await toProvider(providerOrSigner).getNetwork();
+    return toWETH(chainId);
+  }
   return address;
 };
 
@@ -101,38 +109,26 @@ export const toProvider = (providerOrSigner) => {
   return providerOrSigner;
 };
 
+export const proxyFetch = async (uri, config?) => {
+  config = config && { ...config } || { method: 'GET'};
+  config.agent = agent || null;
+  return await fetch(uri, config);
+};
+
+export const ln = (v) => ((console.log(v)), v);
+
 export const getFairValue = async (token, providerOrSigner) => {
-  const provider = toProvider(providerOrSigner);
-  if (ethers.getAddress(token) === ethers.getAddress(USDC_ADDRESS))
-    return ethers.parseUnits("1", 6);
-  const contract = new ethers.Contract(
-    coerceToWeth(token),
-    ["function decimals() view returns (uint8)"],
-    providerOrSigner
-  );
-  const decimals = await contract.decimals();
-  const response = await (
-    await fetch(
-      "https://api.1inch.io/v4.0/1/quote?" +
-        qs.stringify({
-          src: coerceToWeth(token),
-          dst: USDC_ADDRESS,
-          amount: ethers.getUint(ethers.parseUnits("1", decimals)).toString(10),
-        }),
-      {
-        method: "GET",
-        headers: {
-          "content-type": "application/json",
-        },
-      }
-    )
-  ).json();
-  logger.info("fair value of " + token + " is " + response.toTokenAmount);
-  return BigInt(response.toTokenAmount);
+  if (token === ethers.ZeroAddress) token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
+  const response = await (await proxyFetch("https://api.dexscreener.com/latest/dex/tokens/" + token)).text();
+  logger.info(response);
+  const responseAsJson = JSON.parse(response);
+  const priceUsd = responseAsJson.pairs[0].priceUsd;
+  logger.info('fair value of asset is ' + priceUsd);
+  return BigInt(ethers.parseUnits(Number(priceUsd).toFixed(6), 6));
 };
 
 export const toHex = (n: number) => {
-  return ethers.toBeHex(ethers.getUint(Number(n).toFixed(0)));
+  return ethers.toBeHex(ethers.getUint(BigInt(Number(Number(n).toFixed(0)))));
 };
 
 export const postSpread = async (
@@ -142,13 +138,13 @@ export const postSpread = async (
   signer
 ) => {
   const [getsTokenPrice, givesTokenPrice] = await Promise.all(
-    [getsToken, givesToken].map((v) => getFairValue(coerceToWeth(v), signer))
+    [getsToken, givesToken].map(async (v) => getFairValue(v, signer))
   );
   const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
     [getsToken, givesToken].map(
-      (v) =>
+      async (v) =>
         new ethers.Contract(
-          coerceToWeth(v),
+          await coerceToWeth(v, signer),
           ["function decimals() view returns (uint8)"],
           signer
         ).decimals()
@@ -166,8 +162,6 @@ export const postSpread = async (
     .fill(0)
     .map((_, i) => 1 + i * (Number(tolerance) / Number(nOffers)))
     .slice(1);
-    console.log(givesTokenDecimals);
-    console.log(getsTokenDecimals);
   const offersToInsert = priceMultipliers
     .map((v) => Math.pow(v - 1, 2))
     .map(
@@ -201,7 +195,7 @@ export const postSpread = async (
   logger.info("spread posted!");
 };
 
-const signer = new ethers.Wallet(process.env.WALLET).connect(
+const signer = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(
   new ethers.InfuraProvider("mainnet")
 );
 
