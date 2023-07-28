@@ -118,6 +118,7 @@ export const proxyFetch = async (uri, config?) => {
 export const ln = (v) => ((console.log(v)), v);
 
 export const getFairValue = async (token, providerOrSigner) => {
+  if (ethers.getAddress(token) === USDC_ADDRESS) return BigInt(1000000);
   if (token === ethers.ZeroAddress) token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
   const response = await (await proxyFetch("https://api.dexscreener.com/latest/dex/tokens/" + token)).text();
   logger.info(response);
