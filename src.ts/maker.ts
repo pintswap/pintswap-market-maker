@@ -26,8 +26,8 @@ const coerceToWeth = async (address, providerOrSigner) => {
 
 const URI = url.format({
   protocol: "http:",
-  hostname: "127.0.0.1",
-  port: 42161,
+  hostname: HOST,
+  port: PORT
 });
 
 export const add = async ({
