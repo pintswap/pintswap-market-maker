@@ -196,11 +196,13 @@ export const postSpread = async (
   logger.info("spread posted!");
 };
 
+const LLAMA_NODES_KEY =
+    process.env.PROCESS_APP_LLAMA_NODES_KEY || '01HDHGP0YXWDYKRT37QQBDGST5';
 const signer = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(
-  new ethers.InfuraProvider("mainnet")
+  new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`)
 );
 
-const TIMEOUT_MS = 120e3;
+const TIMEOUT_MS = 300e3;
 
 const timeout = async (n) => {
   await new Promise((resolve) => setTimeout(resolve, n));
