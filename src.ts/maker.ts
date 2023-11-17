@@ -1,34 +1,13 @@
-import { ethers } from "ethers";
-import path from "path";
+import { Signer, ethers } from "ethers";
 import url from "url";
 import { getLogger } from "./logger";
 import { toWETH } from "@pintswap/sdk/lib/trade";
-import qs from "querystring";
-import { HttpProxyAgent } from "http-proxy-agent";
-import { ChainId, Token, WETH, Fetcher, Route } from "@uniswap/sdk";
+import { TIMEOUT_MS, USDC_ADDRESS, coerceToWeth, proxyFetch, timeout, toHex, toProvider } from "./utils";
+import { SIGNER, URI } from "./env";
 
 const fetch = (global as any).fetch;
 
 const logger = getLogger();
-
-const PORT = process.env.PINTSWAP_DAEMON_PORT || 42161;
-const HOST = process.env.PINTSWAP_DAEMON_HOST || "127.0.0.1";
-
-const agent = process.env.PINTSWAP_MARKET_MAKER_PROXY ? new HttpProxyAgent(process.env.PINTSWAP_MARKET_MAKER_PROXY) : null;
-
-const coerceToWeth = async (address, providerOrSigner) => {
-  if (address === ethers.ZeroAddress) {
-    const { chainId } = await toProvider(providerOrSigner).getNetwork();
-    return toWETH(chainId);
-  }
-  return address;
-};
-
-const URI = url.format({
-  protocol: "http:",
-  hostname: HOST,
-  port: PORT
-});
 
 export const add = async ({
   getsAmount,
@@ -101,22 +80,6 @@ export const clearOrderbookForPair = async ({
   logger.info("done");
 };
 
-const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-
-export const toProvider = (providerOrSigner) => {
-  if (providerOrSigner.sendTransaction && providerOrSigner.getAddress)
-    return providerOrSigner.provider;
-  return providerOrSigner;
-};
-
-export const proxyFetch = async (uri, config?) => {
-  config = config && { ...config } || { method: 'GET'};
-  config.agent = agent || null;
-  return await fetch(uri, config);
-};
-
-export const ln = (v) => ((console.log(v)), v);
-
 export const getFairValue = async (token, providerOrSigner) => {
   if (ethers.getAddress(token) === USDC_ADDRESS) return BigInt(1000000);
   if (token === ethers.ZeroAddress) token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
@@ -128,15 +91,11 @@ export const getFairValue = async (token, providerOrSigner) => {
   return BigInt(ethers.parseUnits(Number(priceUsd).toFixed(6), 6));
 };
 
-export const toHex = (n: number) => {
-  return ethers.toBeHex(ethers.getUint(BigInt(Number(Number(n).toFixed(0)))));
-};
-
 export const postSpread = async (
   { getsToken, givesToken },
-  tolerance,
-  nOffers,
-  signer
+  tolerance: number = 0.08,
+  nOffers: number = 5,
+  signer: Signer = SIGNER
 ) => {
   const [getsTokenPrice, givesTokenPrice] = await Promise.all(
     [getsToken, givesToken].map(async (v) => getFairValue(v, signer))
@@ -196,33 +155,21 @@ export const postSpread = async (
   logger.info("spread posted!");
 };
 
-const LLAMA_NODES_KEY =
-    process.env.PROCESS_APP_LLAMA_NODES_KEY || '01HDHGP0YXWDYKRT37QQBDGST5';
-const signer = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(
-  new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`)
-);
-
-const TIMEOUT_MS = 300e3;
-
-const timeout = async (n) => {
-  await new Promise((resolve) => setTimeout(resolve, n));
-};
-
-export const runMarketMaker = async ({ tokenA, tokenB }) => {
+export const runMarketMaker = async ({ tokenA, tokenB }, tolerance: number = 0.08, nOffers: number = 5, interval: number = TIMEOUT_MS) => {
   while (true) {
     await clearOrderbookForPair({ tokenA, tokenB });
     await postSpread(
       { getsToken: tokenA, givesToken: tokenB },
-      0.08,
-      5,
-      signer
+      tolerance,
+      nOffers,
+      SIGNER
     );
     await postSpread(
       { getsToken: tokenB, givesToken: tokenA },
-      0.08,
-      5,
-      signer
+      tolerance,
+      nOffers,
+      SIGNER
     );
-    await timeout(TIMEOUT_MS);
+    await timeout(interval);
   }
 };
