@@ -155,21 +155,31 @@ export const postSpread = async (
   logger.info("spread posted!");
 };
 
-export const runMarketMaker = async ({ tokenA, tokenB }, tolerance: number = 0.08, nOffers: number = 5, interval: number = TIMEOUT_MS) => {
+export const runMarketMaker = async (
+  { tokenA, tokenB }, 
+  tolerance: number = 0.08, 
+  nOffers: number = 5, 
+  interval: number = TIMEOUT_MS,
+  side: 'buy' | 'sell' | 'both' = 'both'
+) => {
   while (true) {
     await clearOrderbookForPair({ tokenA, tokenB });
-    await postSpread(
-      { getsToken: tokenA, givesToken: tokenB },
-      tolerance,
-      nOffers,
-      SIGNER
-    );
-    await postSpread(
-      { getsToken: tokenB, givesToken: tokenA },
-      tolerance,
-      nOffers,
-      SIGNER
-    );
+    if(side === 'buy' || side === 'both') {
+      await postSpread(
+        { getsToken: tokenA, givesToken: tokenB },
+        tolerance,
+        nOffers,
+        SIGNER
+      );
+    }
+    if(side === 'sell' || side === 'both') {
+      await postSpread(
+        { getsToken: tokenB, givesToken: tokenA },
+        tolerance,
+        nOffers,
+        SIGNER
+      );
+    }
     await timeout(interval);
   }
 };

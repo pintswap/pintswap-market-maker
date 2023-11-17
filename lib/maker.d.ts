@@ -21,4 +21,4 @@ export declare const postSpread: ({ getsToken, givesToken }: {
 export declare const runMarketMaker: ({ tokenA, tokenB }: {
     tokenA: any;
     tokenB: any;
-}, tolerance?: number, nOffers?: number, interval?: number) => Promise<never>;
+}, tolerance?: number, nOffers?: number, interval?: number, side?: 'buy' | 'sell' | 'both') => Promise<never>;

@@ -11,6 +11,12 @@ const { getLogger } = require('../lib/logger');
 const logger = getLogger();
 
 (async () => {
-  const { tokenA, tokenB, tolerance, offers, interval } = yargs.argv;
-  await runMarketMaker({ tokenA, tokenB }, Number(tolerance), Number(offers), Number(interval));
+  const { tokenA, tokenB, tolerance, offers, interval, side } = yargs.argv;
+  await runMarketMaker(
+    { tokenA, tokenB }, 
+    Number(tolerance || 0.08), 
+    Number(offers || 5), 
+    Number(interval || (300 * 1000)),
+    side || 'both'
+  );
 })().catch((err) => logger.error(err));
