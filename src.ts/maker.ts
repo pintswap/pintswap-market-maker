@@ -14,7 +14,9 @@ const logger = getLogger();
 const PORT = process.env.PINTSWAP_DAEMON_PORT || 42161;
 const HOST = process.env.PINTSWAP_DAEMON_HOST || "127.0.0.1";
 
-const agent = process.env.PINTSWAP_MARKET_MAKER_PROXY ? new HttpProxyAgent(process.env.PINTSWAP_MARKET_MAKER_PROXY) : null;
+const agent = process.env.PINTSWAP_MARKET_MAKER_PROXY
+  ? new HttpProxyAgent(process.env.PINTSWAP_MARKET_MAKER_PROXY)
+  : null;
 
 const coerceToWeth = async (address, providerOrSigner) => {
   if (address === ethers.ZeroAddress) {
@@ -27,7 +29,7 @@ const coerceToWeth = async (address, providerOrSigner) => {
 const URI = url.format({
   protocol: "http:",
   hostname: HOST,
-  port: PORT
+  port: PORT,
 });
 
 export const add = async ({
@@ -52,6 +54,16 @@ export const add = async ({
     })
   ).json();
 };
+
+async function publishOnce() {
+  return await fetch(URI + "/publish-once", {
+    method: "POST",
+    body: JSON.stringify({}),
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+}
 
 export const offers = async () => {
   return (
@@ -91,8 +103,10 @@ export const clearOrderbookForPair = async ({
   const filtered = offerList
     .filter(
       (v) =>
-        (v.gets.token.toLowerCase() === gets && v.gives.token.toLowerCase() === gives) ||
-        (v.gives.token.toLowerCase() === gets && v.gets.token.toLowerCase() === gives)
+        (v.gets.token.toLowerCase() === gets &&
+          v.gives.token.toLowerCase() === gives) ||
+        (v.gives.token.toLowerCase() === gets &&
+          v.gets.token.toLowerCase() === gives),
     )
     .map((v) => v.id);
   for (const id of filtered) {
@@ -110,21 +124,24 @@ export const toProvider = (providerOrSigner) => {
 };
 
 export const proxyFetch = async (uri, config?) => {
-  config = config && { ...config } || { method: 'GET'};
+  config = (config && { ...config }) || { method: "GET" };
   config.agent = agent || null;
   return await fetch(uri, config);
 };
 
-export const ln = (v) => ((console.log(v)), v);
+export const ln = (v) => (console.log(v), v);
 
 export const getFairValue = async (token, providerOrSigner) => {
   if (ethers.getAddress(token) === USDC_ADDRESS) return BigInt(1000000);
-  if (token === ethers.ZeroAddress) token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
-  const response = await (await proxyFetch("https://api.dexscreener.com/latest/dex/tokens/" + token)).text();
+  if (token === ethers.ZeroAddress)
+    token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
+  const response = await (
+    await proxyFetch("https://api.dexscreener.com/latest/dex/tokens/" + token)
+  ).text();
   logger.info(response);
   const responseAsJson = JSON.parse(response);
   const priceUsd = responseAsJson.pairs[0].priceUsd;
-  logger.info('fair value of asset is ' + priceUsd);
+  logger.info("fair value of asset is " + priceUsd);
   return BigInt(ethers.parseUnits(Number(priceUsd).toFixed(6), 6));
 };
 
@@ -136,20 +153,19 @@ export const postSpread = async (
   { getsToken, givesToken },
   tolerance,
   nOffers,
-  signer
+  signer,
 ) => {
   const [getsTokenPrice, givesTokenPrice] = await Promise.all(
-    [getsToken, givesToken].map(async (v) => getFairValue(v, signer))
+    [getsToken, givesToken].map(async (v) => getFairValue(v, signer)),
   );
   const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
-    [getsToken, givesToken].map(
-      async (v) =>
-        new ethers.Contract(
-          await coerceToWeth(v, signer),
-          ["function decimals() view returns (uint8)"],
-          signer
-        ).decimals()
-    )
+    [getsToken, givesToken].map(async (v) =>
+      new ethers.Contract(
+        await coerceToWeth(v, signer),
+        ["function decimals() view returns (uint8)"],
+        signer,
+      ).decimals(),
+    ),
   );
   const givesTokenBalance =
     givesToken === ethers.ZeroAddress
@@ -157,7 +173,7 @@ export const postSpread = async (
       : await new ethers.Contract(
           givesToken,
           ["function balanceOf(address) view returns (uint256)"],
-          signer
+          signer,
         ).balanceOf(await signer.getAddress());
   const priceMultipliers = Array(Number(nOffers) + 1)
     .fill(0)
@@ -172,7 +188,7 @@ export const postSpread = async (
           if (!sum) sum = ary.reduce((r, v) => r + v, 0);
           return v / sum;
         };
-      })()
+      })(),
     )
     .map((v, i) => {
       return {
@@ -183,8 +199,9 @@ export const postSpread = async (
           (v *
             Number(givesTokenBalance) *
             priceMultipliers[i] *
-            Number(givesTokenPrice))*Math.pow(10, Number(getsTokenDecimals)) /
-            (Math.pow(10, Number(givesTokenDecimals))*Number(getsTokenPrice))
+            Number(givesTokenPrice) *
+            Math.pow(10, Number(getsTokenDecimals))) /
+            (Math.pow(10, Number(givesTokenDecimals)) * Number(getsTokenPrice)),
         ),
       };
     });
@@ -197,9 +214,9 @@ export const postSpread = async (
 };
 
 const LLAMA_NODES_KEY =
-    process.env.PROCESS_APP_LLAMA_NODES_KEY || '01HDHGP0YXWDYKRT37QQBDGST5';
+  process.env.PROCESS_APP_LLAMA_NODES_KEY || "01HDHGP0YXWDYKRT37QQBDGST5";
 const signer = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(
-  new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`)
+  new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`),
 );
 
 const TIMEOUT_MS = 300e3;
@@ -215,14 +232,15 @@ export const runMarketMaker = async ({ tokenA, tokenB }) => {
       { getsToken: tokenA, givesToken: tokenB },
       0.08,
       5,
-      signer
+      signer,
     );
     await postSpread(
       { getsToken: tokenB, givesToken: tokenA },
       0.08,
       5,
-      signer
+      signer,
     );
+    await publishOnce();
     await timeout(TIMEOUT_MS);
   }
 };
