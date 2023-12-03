@@ -412,10 +412,10 @@
   resolved "https://registry.yarnpkg.com/@noble/secp256k1/-/secp256k1-1.7.1.tgz#b251c70f824ce3ca7f8dc3df08d58f005cc0507c"
   integrity sha512-hOUk6AyBFmqVrv7k5WAw/LpszxVbj9gGN4JRkIX52fdFAj1UA61KXmZDvqVEm+pOyec3+fIeZB02LYa/pWOArw==
 
-"@pintswap/sdk@^1.4.10":
-  version "1.4.10"
-  resolved "https://registry.yarnpkg.com/@pintswap/sdk/-/sdk-1.4.10.tgz#8826ec2fbb90306bda9991779a90f3a4bd8b6912"
-  integrity sha512-Aprw0XnUNhFGcxX1NEEbXtgAU1NQkrFpsMPkxEauwBSPYqZVJgodo+ei5le95FVmiPcoYC7K/9mkTiavuw8kug==
+"@pintswap/sdk@^1.4.26":
+  version "1.4.26"
+  resolved "https://registry.yarnpkg.com/@pintswap/sdk/-/sdk-1.4.26.tgz#2337e9dfeada7d361ea3bbd38be3461cf61bad02"
+  integrity sha512-xnNaOMkAojfP90uPLBREteFMygs1hGoWdK2L5I85FK9j7KRO4tiGkNKGIsKg96k75AUnClYS4aopOTPU7sT3dA==
   dependencies:
     "@multiformats/multiaddr" "^12.1.0"
     "@noble/ed25519" "^1.6.0"
@@ -424,6 +424,7 @@
     aes-js "^3.1.2"
     assert "^2.0.0"
     base64url "^3.0.1"
+    bech32 "^2.0.0"
     bn.js "^5.2.1"
     buffer "^6.0.3"
     canonical-weth "^1.4.0"
@@ -1005,6 +1006,11 @@ bech32@1.1.4:
   version "1.1.4"
   resolved "https://registry.yarnpkg.com/bech32/-/bech32-1.1.4.tgz#e38c9f37bf179b8eb16ae3a772b40c356d4832e9"
   integrity sha512-s0IrSOzLlbvX7yp4WBfPITzpAU8sqQcpsmwXDiKwrG4r491vwCO/XpejasRNl0piBMe/DvP4Tz0mIS/X1DPJBQ==
+
+bech32@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/bech32/-/bech32-2.0.0.tgz#078d3686535075c8c79709f054b1b226a133b355"
+  integrity sha512-LcknSilhIGatDAsY1ak2I8VtGaHNhgMSYVxFrGLXv+xLHytaKZKcaUJJUE7qmBr7h33o5YQwP55pMI0xmkpJwg==
 
 big.js@^5.2.2:
   version "5.2.2"
@@ -1615,9 +1621,9 @@ elliptic@6.5.4, elliptic@^6.5.3, elliptic@^6.5.4:
     minimalistic-assert "^1.0.1"
     minimalistic-crypto-utils "^1.0.1"
 
-"emasm@https://github.com/kungfuflex/emasm":
+"emasm@git+https://github.com/kungfuflex/emasm.git":
   version "0.2.0"
-  resolved "https://github.com/kungfuflex/emasm#d2f5d922f0dc0440e7b227a441ce516058e2682f"
+  resolved "git+https://github.com/kungfuflex/emasm.git#d662a391fa51c4c50561222a321de7d035c7831a"
 
 emoji-regex@^8.0.0:
   version "8.0.0"
@@ -1781,9 +1787,9 @@ events@^3.3.0:
   resolved "https://registry.yarnpkg.com/events/-/events-3.3.0.tgz#31a95ad0a924e2d2c419a813aeb2c4e878ea7400"
   integrity sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==
 
-"evmdis@https://github.com/kungfuflex/evmdis":
+"evmdis@git+https://github.com/kungfuflex/evmdis.git":
   version "0.1.0"
-  resolved "https://github.com/kungfuflex/evmdis#e33d82f8873a03ad4d802fc7023b1cf228558c53"
+  resolved "git+https://github.com/kungfuflex/evmdis.git#e33d82f8873a03ad4d802fc7023b1cf228558c53"
   dependencies:
     fs-extra "^7.0.1"
     yargs "^12.0.5"
