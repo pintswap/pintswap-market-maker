@@ -215,9 +215,9 @@ export const postSpread = async (
 
 const LLAMA_NODES_KEY =
   process.env.PROCESS_APP_LLAMA_NODES_KEY || "01HDHGP0YXWDYKRT37QQBDGST5";
-const signer = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(
-  new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`),
-);
+// const provider = new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`);
+const provider = new ethers.AlchemyProvider(`mainnet`, `KsA01_UT0zpC1_F11oCf25sblF1ZCVdb`);
+const signer = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(provider);
 
 const TIMEOUT_MS = 300e3;
 
