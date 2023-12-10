@@ -40,10 +40,10 @@ const customFormatter = ({ level, message, label, timestamp }) => {
 
 const createLogger = (proc?: string) => {
   addColors(customColors);
-  const service = proc || 'pintswap-market-maker';
+  const service = proc || "pintswap-market-maker";
   const logger = createWinstonLogger({
     defaultMeta: {
-      service
+      service,
     },
     levels: customLevels,
     format: format.combine(format.errors({ stack: true }), format.json()),
@@ -62,7 +62,7 @@ const createLogger = (proc?: string) => {
   const error = logger.error;
   (logger as any).error = function (err) {
     if (err instanceof Error) {
-      error.call(logger, '');
+      error.call(logger, "");
       console.error(err);
     } else error.call(logger, err);
   };

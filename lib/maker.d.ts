@@ -17,8 +17,8 @@ export declare const getFairValue: (token: any, providerOrSigner: any) => Promis
 export declare const postSpread: ({ getsToken, givesToken }: {
     getsToken: any;
     givesToken: any;
-}, tolerance?: number, nOffers?: number, signer?: Signer) => Promise<void>;
+}, tolerance?: number, nOffers?: number, signer?: Signer, amount?: string) => Promise<void>;
 export declare const runMarketMaker: ({ tokenA, tokenB }: {
     tokenA: any;
     tokenB: any;
-}, tolerance?: number, nOffers?: number, interval?: number, side?: 'buy' | 'sell' | 'both') => Promise<never>;
+}, tolerance?: number, nOffers?: number, interval?: number, side?: 'buy' | 'sell' | 'both', amount?: string) => Promise<never>;

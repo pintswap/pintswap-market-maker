@@ -18,6 +18,7 @@ pintswap-market-maker --token-a <address> --token-b <address>
 --tolerance <number> # the max percent fluctuation away from market price (Default: 0.08)
 --offers <number> # number of offers to post (Default: 5)
 --interval <number> # post new offers interval (Default: 5 min)
+--amount <number> # amount of token you'd like to trade (Default: uses wallet token balance)
 --side <buy | sell | both> # choose what side you would like to market make on (Default: both)
 ```
 

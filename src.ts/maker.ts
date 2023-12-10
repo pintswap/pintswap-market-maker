@@ -1,5 +1,4 @@
-import { Signer, ethers } from "ethers";
-import url from "url";
+import { BigNumberish, Signer, ethers } from "ethers";
 import { getLogger } from "./logger";
 import { toWETH } from "@pintswap/sdk/lib/trade";
 import { TIMEOUT_MS, USDC_ADDRESS, coerceToWeth, proxyFetch, timeout, toHex, toProvider } from "./utils";
@@ -31,6 +30,16 @@ export const add = async ({
     })
   ).json();
 };
+
+async function publishOnce() {
+  return await fetch(URI + "/publish-once", {
+    method: "POST",
+    body: JSON.stringify({}),
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+}
 
 export const offers = async () => {
   return (
@@ -70,8 +79,10 @@ export const clearOrderbookForPair = async ({
   const filtered = offerList
     .filter(
       (v) =>
-        (v.gets.token.toLowerCase() === gets && v.gives.token.toLowerCase() === gives) ||
-        (v.gives.token.toLowerCase() === gets && v.gets.token.toLowerCase() === gives)
+        (v.gets.token.toLowerCase() === gets &&
+          v.gives.token.toLowerCase() === gives) ||
+        (v.gives.token.toLowerCase() === gets &&
+          v.gets.token.toLowerCase() === gives),
     )
     .map((v) => v.id);
   for (const id of filtered) {
@@ -82,12 +93,15 @@ export const clearOrderbookForPair = async ({
 
 export const getFairValue = async (token, providerOrSigner) => {
   if (ethers.getAddress(token) === USDC_ADDRESS) return BigInt(1000000);
-  if (token === ethers.ZeroAddress) token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
-  const response = await (await proxyFetch("https://api.dexscreener.com/latest/dex/tokens/" + token)).text();
+  if (token === ethers.ZeroAddress)
+    token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
+  const response = await (
+    await proxyFetch("https://api.dexscreener.com/latest/dex/tokens/" + token)
+  ).text();
   logger.info(response);
   const responseAsJson = JSON.parse(response);
   const priceUsd = responseAsJson.pairs[0].priceUsd;
-  logger.info('fair value of asset is ' + priceUsd);
+  logger.info("fair value of asset is " + priceUsd);
   return BigInt(ethers.parseUnits(Number(priceUsd).toFixed(6), 6));
 };
 
@@ -95,33 +109,52 @@ export const postSpread = async (
   { getsToken, givesToken },
   tolerance: number = 0.08,
   nOffers: number = 5,
-  signer: Signer = SIGNER
+  signer: Signer = SIGNER,
+  amount?: string
 ) => {
   const [getsTokenPrice, givesTokenPrice] = await Promise.all(
-    [getsToken, givesToken].map(async (v) => getFairValue(v, signer))
+    [getsToken, givesToken].map(async (v) => getFairValue(v, signer)),
   );
+
   const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
-    [getsToken, givesToken].map(
-      async (v) =>
-        new ethers.Contract(
-          await coerceToWeth(v, signer),
-          ["function decimals() view returns (uint8)"],
-          signer
-        ).decimals()
-    )
+    [getsToken, givesToken].map(async (v) =>
+      new ethers.Contract(
+        await coerceToWeth(v, signer),
+        ["function decimals() view returns (uint8)"],
+        signer,
+      ).decimals(),
+    ),
   );
-  const givesTokenBalance =
+  
+  let maxOfferAmount: BigNumberish;
+  if(amount) {
+    if(givesToken === ethers.ZeroAddress) {
+      maxOfferAmount = ethers.parseEther(amount);
+    } else {
+      const decimals = await new ethers.Contract(
+        givesToken,
+        ['function decimals() view returns (uint8)'],
+        signer,
+      ).decimals();
+      maxOfferAmount = ethers.parseUnits(amount, decimals);
+    }
+  } else {
+    const givesTokenBalance =
     givesToken === ethers.ZeroAddress
       ? await signer.provider.getBalance(await signer.getAddress())
       : await new ethers.Contract(
           givesToken,
           ["function balanceOf(address) view returns (uint256)"],
-          signer
+          signer,
         ).balanceOf(await signer.getAddress());
+    maxOfferAmount = givesTokenBalance;
+  }
+
   const priceMultipliers = Array(Number(nOffers) + 1)
     .fill(0)
     .map((_, i) => 1 + i * (Number(tolerance) / Number(nOffers)))
     .slice(1);
+
   const offersToInsert = priceMultipliers
     .map((v) => Math.pow(v - 1, 2))
     .map(
@@ -131,28 +164,30 @@ export const postSpread = async (
           if (!sum) sum = ary.reduce((r, v) => r + v, 0);
           return v / sum;
         };
-      })()
+      })(),
     )
     .map((v, i) => {
       return {
         givesToken,
-        givesAmount: toHex(v * Number(givesTokenBalance)),
+        givesAmount: toHex(v * Number(maxOfferAmount)),
         getsToken,
         getsAmount: toHex(
           (v *
-            Number(givesTokenBalance) *
+            Number(maxOfferAmount) *
             priceMultipliers[i] *
-            Number(givesTokenPrice))*Math.pow(10, Number(getsTokenDecimals)) /
-            (Math.pow(10, Number(givesTokenDecimals))*Number(getsTokenPrice))
+            Number(givesTokenPrice) *
+            Math.pow(10, Number(getsTokenDecimals))) /
+            (Math.pow(10, Number(givesTokenDecimals)) * Number(getsTokenPrice)),
         ),
       };
     });
-  logger.info("posting spread --");
+
+  logger.info("-- posting spread --");
   for (const item of offersToInsert) {
     logger.info(item);
     await add(item);
   }
-  logger.info("spread posted!");
+  logger.info("-- spread posted --");
 };
 
 export const runMarketMaker = async (
@@ -160,26 +195,33 @@ export const runMarketMaker = async (
   tolerance: number = 0.08, 
   nOffers: number = 5, 
   interval: number = TIMEOUT_MS,
-  side: 'buy' | 'sell' | 'both' = 'both'
+  side: 'buy' | 'sell' | 'both' = 'both',
+  amount?: string
 ) => {
   while (true) {
     await clearOrderbookForPair({ tokenA, tokenB });
+
     if(side === 'buy' || side === 'both') {
       await postSpread(
         { getsToken: tokenA, givesToken: tokenB },
         tolerance,
         nOffers,
-        SIGNER
+        SIGNER,
+        amount
       );
     }
+
     if(side === 'sell' || side === 'both') {
       await postSpread(
         { getsToken: tokenB, givesToken: tokenA },
         tolerance,
         nOffers,
-        SIGNER
+        SIGNER,
+        amount
       );
     }
+
+    await publishOnce();
     await timeout(interval);
   }
 };

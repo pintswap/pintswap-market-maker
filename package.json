@@ -7,14 +7,15 @@
     "pintswap-market-maker": "./bin/maker.js"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prettier": "prettier --write ./src.ts/*.ts"
   },
   "repository": "https://github.com/pintswap/pintswap-daemon",
   "author": "altinak",
   "license": "MIT",
   "private": false,
   "dependencies": {
-    "@pintswap/sdk": "^1.4.10",
+    "@pintswap/sdk": "^1.4.31",
     "@uniswap/sdk": "^3.0.3",
     "body-parser": "^1.20.2",
     "change-case": "^4.1.2",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.15.11",
+    "prettier": "^3.1.0",
     "typescript": "^5.0.4"
   }
 }

@@ -2,9 +2,13 @@ import { ethers } from "ethers";
 import { HttpProxyAgent } from "http-proxy-agent";
 import url from "url";
 
-export const SIGNER = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(
-  new ethers.InfuraProvider("mainnet")
-);
+const LLAMA_NODES_KEY =
+  process.env.PROCESS_APP_LLAMA_NODES_KEY || "01HDHGP0YXWDYKRT37QQBDGST5";
+// const provider = new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`);
+// const provider = new ethers.AlchemyProvider(`mainnet`, `KsA01_UT0zpC1_F11oCf25sblF1ZCVdb`);
+export const PROVIDER = new ethers.InfuraProvider('mainnet', '1efb74c6a48c478298a1b2d68ad4532d');
+
+export const SIGNER = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(PROVIDER);
 
 export const PORT = process.env.PINTSWAP_DAEMON_PORT || 42161;
 
