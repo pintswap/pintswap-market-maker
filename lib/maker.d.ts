@@ -4,11 +4,11 @@ export declare const add: ({ getsAmount, givesAmount, getsToken, givesToken, }: 
     givesAmount: any;
     getsToken: any;
     givesToken: any;
-}) => Promise<any>;
-export declare const offers: () => Promise<any>;
+}, uri?: string) => Promise<any>;
+export declare const offers: (uri?: string) => Promise<any>;
 export declare const deleteOffer: ({ id }: {
     id: any;
-}) => Promise<any>;
+}, uri?: string) => Promise<any>;
 export declare const clearOrderbookForPair: ({ tokenA: getsToken, tokenB: givesToken, }: {
     tokenA: any;
     tokenB: any;
@@ -17,8 +17,8 @@ export declare const getFairValue: (token: any, providerOrSigner: any) => Promis
 export declare const postSpread: ({ getsToken, givesToken }: {
     getsToken: any;
     givesToken: any;
-}, tolerance?: number, nOffers?: number, signer?: Signer, amount?: string) => Promise<void>;
+}, tolerance?: number, nOffers?: number, signer?: Signer, amount?: string, uri?: string) => Promise<void>;
 export declare const runMarketMaker: ({ tokenA, tokenB }: {
     tokenA: any;
     tokenB: any;
-}, tolerance?: number, nOffers?: number, interval?: number, side?: 'buy' | 'sell' | 'both', amount?: string) => Promise<never>;
+}, tolerance?: number, nOffers?: number, interval?: number, side?: 'buy' | 'sell' | 'both', amount?: string, uri?: string) => Promise<never>;

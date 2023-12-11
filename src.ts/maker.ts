@@ -13,10 +13,10 @@ export const add = async ({
   givesAmount,
   getsToken,
   givesToken,
-}) => {
+}, uri = URI) => {
   logger.info("adding order");
   return (
-    await fetch(URI + "/add", {
+    await fetch(uri + "/add", {
       method: "POST",
       body: JSON.stringify({
         getsAmount,
@@ -31,8 +31,8 @@ export const add = async ({
   ).json();
 };
 
-async function publishOnce() {
-  return await fetch(URI + "/publish-once", {
+async function publishOnce(uri = URI) {
+  return await fetch(uri + "/publish-once", {
     method: "POST",
     body: JSON.stringify({}),
     headers: {
@@ -41,10 +41,10 @@ async function publishOnce() {
   });
 }
 
-export const offers = async () => {
+export const offers = async (uri = URI) => {
   return (
     await (
-      await fetch(URI + "/offers", {
+      await fetch(uri + "/offers", {
         method: "POST",
         body: JSON.stringify({}),
         headers: {
@@ -55,9 +55,9 @@ export const offers = async () => {
   ).result;
 };
 
-export const deleteOffer = async ({ id }) => {
+export const deleteOffer = async ({ id }, uri = URI) => {
   return (
-    await fetch(URI + "/delete", {
+    await fetch(uri + "/delete", {
       method: "POST",
       body: JSON.stringify({
         id,
@@ -110,7 +110,8 @@ export const postSpread = async (
   tolerance: number = 0.08,
   nOffers: number = 5,
   signer: Signer = SIGNER,
-  amount?: string
+  amount?: string,
+  uri = URI
 ) => {
   const [getsTokenPrice, givesTokenPrice] = await Promise.all(
     [getsToken, givesToken].map(async (v) => getFairValue(v, signer)),
@@ -185,7 +186,7 @@ export const postSpread = async (
   logger.info("-- posting spread --");
   for (const item of offersToInsert) {
     logger.info(item);
-    await add(item);
+    await add(item, uri);
   }
   logger.info("-- spread posted --");
 };
@@ -196,7 +197,8 @@ export const runMarketMaker = async (
   nOffers: number = 5, 
   interval: number = TIMEOUT_MS,
   side: 'buy' | 'sell' | 'both' = 'both',
-  amount?: string
+  amount?: string,
+  uri = URI,
 ) => {
   while (true) {
     await clearOrderbookForPair({ tokenA, tokenB });
@@ -207,7 +209,8 @@ export const runMarketMaker = async (
         tolerance,
         nOffers,
         SIGNER,
-        amount
+        amount,
+        uri
       );
     }
 
@@ -217,11 +220,12 @@ export const runMarketMaker = async (
         tolerance,
         nOffers,
         SIGNER,
-        amount
+        amount,
+        uri
       );
     }
 
-    await publishOnce();
+    await publishOnce(uri);
     await timeout(interval);
   }
 };
