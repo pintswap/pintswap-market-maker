@@ -3,6 +3,7 @@ import { getLogger } from "./logger";
 import { toWETH } from "@pintswap/sdk/lib/trade";
 import { TIMEOUT_MS, USDC_ADDRESS, coerceToWeth, proxyFetch, timeout, toHex, toProvider } from "./utils";
 import { SIGNER, URI } from "./env";
+import { IMarketMaker } from "./types";
 
 const fetch = (global as any).fetch;
 
@@ -230,3 +231,71 @@ export const runMarketMaker = async (
     await timeout(interval);
   }
 };
+
+class MarketMaker {
+  public uri: string;
+  public isStarted: boolean;
+  public side: 'sell' | 'buy' | 'both';
+  public tokenA: string;
+  public tokenB: string;
+  public numberOfOffers: number;
+  public tolerance: number;
+  public interval: number;
+  public amount: string;
+  public price: string;
+  public signer: Signer;
+
+  constructor({
+    uri = URI,
+    isStarted = true,
+    side = 'both',
+    tokenA,
+    tokenB,
+    numberOfOffers = 5,
+    tolerance = 0.08,
+    interval = TIMEOUT_MS,
+    amount,
+    price,
+    signer = SIGNER,
+  }: IMarketMaker) {
+    Object.assign(this, {
+      uri,
+      isStarted,
+      side,
+      tokenA,
+      tokenB,
+      numberOfOffers,
+      tolerance,
+      interval,
+      amount,
+      price,
+      signer,
+    });
+  }
+
+  async setSigner(signer: Signer) {
+
+  }
+
+  getSigner() {
+    return this.signer;
+  }
+
+  async setPair(tokenA: string, tokenB: string) {
+
+  }
+
+  getPair() {
+    return [this.tokenA, this.tokenB];
+  }
+
+  run() {
+    if(this.isStarted) return;
+    return this.isStarted = true;
+  }
+
+  stop() {
+    if(!this.isStarted) return;
+    return this.isStarted = false;
+  }
+}

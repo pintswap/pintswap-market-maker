@@ -8,3 +8,16 @@ export type ISpreadConfig = {
     numberOfOffers: number;
     signer: Signer;
 };
+export type IMarketMaker = {
+    uri: string;
+    isStarted: boolean;
+    side: 'sell' | 'buy' | 'both';
+    tokenA: string;
+    tokenB: string;
+    numberOfOffers: number;
+    tolerance: number;
+    interval: number;
+    amount: string;
+    price: string;
+    signer: Signer;
+};
