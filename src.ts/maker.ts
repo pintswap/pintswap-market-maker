@@ -198,8 +198,8 @@ export const runMarketMaker = async (
   signer: Signer = SIGNER,
   interval: number = TIMEOUT_MS,
   side: 'buy' | 'sell' | 'both' = 'both',
+  uri,
   amount?: string,
-  uri = URI,
 ) => {
   while (true) {
     await clearOrderbookForPair({ tokenA, tokenB });
