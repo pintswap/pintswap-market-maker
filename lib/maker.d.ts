@@ -12,7 +12,7 @@ export declare const deleteOffer: ({ id }: {
 export declare const clearOrderbookForPair: ({ tokenA: getsToken, tokenB: givesToken, }: {
     tokenA: any;
     tokenB: any;
-}) => Promise<void>;
+}, uri: any) => Promise<void>;
 export declare const getFairValue: (token: any, providerOrSigner: any) => Promise<bigint>;
 export declare const postSpread: ({ getsToken, givesToken }: {
     getsToken: any;

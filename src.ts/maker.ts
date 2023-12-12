@@ -72,8 +72,8 @@ export const deleteOffer = async ({ id }, uri = URI) => {
 export const clearOrderbookForPair = async ({
   tokenA: getsToken,
   tokenB: givesToken,
-}) => {
-  const offerList = await offers();
+}, uri) => {
+  const offerList = await offers(uri);
   logger.info("deleting " + offerList.length + " orders");
   const [gets, gives] = [getsToken, givesToken].map((v) => v.toLowerCase());
   const filtered = offerList
@@ -86,7 +86,7 @@ export const clearOrderbookForPair = async ({
     )
     .map((v) => v.id);
   for (const id of filtered) {
-    await deleteOffer({ id });
+    await deleteOffer({ id }, uri);
   }
   logger.info("done");
 };
@@ -202,7 +202,7 @@ export const runMarketMaker = async (
   amount?: string,
 ) => {
   while (true) {
-    await clearOrderbookForPair({ tokenA, tokenB });
+    await clearOrderbookForPair({ tokenA, tokenB }, uri);
 
     if(side === 'buy' || side === 'both') {
       await postSpread(
