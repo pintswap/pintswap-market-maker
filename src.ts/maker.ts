@@ -195,7 +195,7 @@ export const runMarketMaker = async (
   { tokenA, tokenB }, 
   tolerance: number = 0.08, 
   nOffers: number = 5, 
-  signer: Signer = = SIGNER,
+  signer: Signer = SIGNER,
   interval: number = TIMEOUT_MS,
   side: 'buy' | 'sell' | 'both' = 'both',
   amount?: string,
