@@ -1,9 +1,10 @@
-import { BigNumberish, Signer, ethers } from "ethers";
-import { getLogger } from "./logger";
+import { BigNumberish, Signer, Wallet, ethers, getAddress, isAddress } from "ethers";
+import { createLogger, getLogger } from "./logger";
 import { toWETH } from "@pintswap/sdk/lib/trade";
 import { TIMEOUT_MS, USDC_ADDRESS, coerceToWeth, proxyFetch, timeout, toHex, toProvider } from "./utils";
 import { SIGNER, URI } from "./env";
 import { IMarketMaker } from "./types";
+import { Pintswap } from "@pintswap/sdk";
 
 const fetch = (global as any).fetch;
 
@@ -192,110 +193,153 @@ export const postSpread = async (
   logger.info("-- spread posted --");
 };
 
-export const runMarketMaker = async (
-  { tokenA, tokenB }, 
-  tolerance: number = 0.08, 
-  nOffers: number = 5, 
-  signer: Signer = SIGNER,
-  interval: number = TIMEOUT_MS,
-  side: 'buy' | 'sell' | 'both' = 'both',
-  uri,
-  amount?: string,
-) => {
-  while (true) {
-    await clearOrderbookForPair({ tokenA, tokenB }, uri);
-
-    if(side === 'buy' || side === 'both') {
-      await postSpread(
-        { getsToken: tokenA, givesToken: tokenB },
-        tolerance,
-        nOffers,
-        signer,
-        amount,
-        uri
-      );
-    }
-
-    if(side === 'sell' || side === 'both') {
-      await postSpread(
-        { getsToken: tokenB, givesToken: tokenA },
-        tolerance,
-        nOffers,
-        signer,
-        amount,
-        uri
-      );
-    }
-
-    await publishOnce(uri);
-    await timeout(interval);
-  }
-};
-
-class MarketMaker {
-  public uri: string;
+export class MarketMaker {
   public isStarted: boolean;
-  public side: 'sell' | 'buy' | 'both';
-  public tokenA: string;
-  public tokenB: string;
-  public numberOfOffers: number;
-  public tolerance: number;
-  public interval: number;
-  public amount: string;
-  public price: string;
-  public signer: Signer;
+  public uri: string;
 
   constructor({
     uri = URI,
-    isStarted = true,
-    side = 'both',
-    tokenA,
-    tokenB,
-    numberOfOffers = 5,
-    tolerance = 0.08,
-    interval = TIMEOUT_MS,
-    amount,
-    price,
-    signer = SIGNER,
+    isStarted = false,
   }: IMarketMaker) {
     Object.assign(this, {
       uri,
       isStarted,
-      side,
-      tokenA,
-      tokenB,
-      numberOfOffers,
-      tolerance,
-      interval,
-      amount,
-      price,
-      signer,
     });
   }
 
-  async setSigner(signer: Signer) {
-
-  }
-
-  getSigner() {
-    return this.signer;
-  }
-
-  async setPair(tokenA: string, tokenB: string) {
-
-  }
-
-  getPair() {
-    return [this.tokenA, this.tokenB];
-  }
-
-  run() {
-    if(this.isStarted) return;
-    return this.isStarted = true;
-  }
-
   stop() {
-    if(!this.isStarted) return;
+    if(!this.isStarted) {
+      logger.info('Market Maker not started.')
+      return
+    };
     return this.isStarted = false;
   }
+
+  async runMarketMaker (
+    { tokenA, tokenB }, 
+    tolerance: number = 0.08, 
+    nOffers: number = 5, 
+    signer: Signer = SIGNER,
+    interval: number = TIMEOUT_MS,
+    side: 'buy' | 'sell' | 'both' = 'both',
+    amount?: string,
+  ) {
+    this.isStarted = true;
+    while (this.isStarted) {
+      await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
+  
+      if(side === 'buy' || side === 'both') {
+        await postSpread(
+          { getsToken: tokenA, givesToken: tokenB },
+          tolerance,
+          nOffers,
+          signer,
+          amount,
+          this.uri
+        );
+      }
+  
+      if(side === 'sell' || side === 'both') {
+        await postSpread(
+          { getsToken: tokenB, givesToken: tokenA },
+          tolerance,
+          nOffers,
+          signer,
+          amount,
+          this.uri
+        );
+      }
+  
+      await publishOnce(this.uri);
+      await timeout(interval);
+    }
+  };
+  // TODO: finish
+  // public uri: string;
+  // public isStarted: boolean;
+  // public side: 'sell' | 'buy' | 'both';
+  // public tokenA: string;
+  // public tokenB: string;
+  // public numberOfOffers: number;
+  // public tolerance: number;
+  // public interval: number;
+  // public amount: string;
+  // public price: string;
+  // public signer: Signer;
+  // public pintswap: Pintswap;
+  // public logger: ReturnType<typeof createLogger>;
+
+  // constructor({
+  //   uri = URI,
+  //   isStarted = false,
+  //   side = 'both',
+  //   tokenA,
+  //   tokenB,
+  //   numberOfOffers = 5,
+  //   tolerance = 0.08,
+  //   interval = TIMEOUT_MS,
+  //   amount,
+  //   price,
+  //   signer = SIGNER,
+  // }: IMarketMaker) {
+  //   this.logger = logger;
+  //   Object.assign(this, {
+  //     uri,
+  //     isStarted,
+  //     side,
+  //     tokenA,
+  //     tokenB,
+  //     numberOfOffers,
+  //     tolerance,
+  //     interval,
+  //     amount,
+  //     price,
+  //     signer,
+  //   });
+  // }
+
+  // async setSigner(signer: Signer) {
+
+  // }
+
+  // getSigner() {
+  //   return this.signer;
+  // }
+
+  // async setInterval(_interval: number) {
+
+  // }
+
+  // async setPair(tokenA: string, tokenB: string) {
+  //   if(!isAddress(tokenA)) {
+  //     this.logger.error('Token A is not an appropriate address.');
+  //     return;
+  //   }
+  //   if(!isAddress(tokenB)) {
+  //     this.logger.error('Token B is not an appropriate address.');
+  //     return;
+  //   }
+  //   this.tokenA = getAddress(tokenA);
+  //   this.tokenB = getAddress(tokenB);
+  // }
+
+  // getPair() {
+  //   return [this.tokenA, this.tokenB];
+  // }
+
+  // run() {
+  //   if(this.isStarted) {
+  //     this.logger.info('Market Maker already started.')
+  //     return;
+  //   };
+  //   return this.isStarted = true;
+  // }
+
+  // stop() {
+  //   if(!this.isStarted) {
+  //     this.logger.info('Market Maker not started.')
+  //     return
+  //   };
+  //   return this.isStarted = false;
+  // }
 }
