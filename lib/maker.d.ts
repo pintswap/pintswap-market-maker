@@ -1,4 +1,5 @@
 import { Signer } from "ethers";
+import { IMarketMaker } from "./types";
 export declare const add: ({ getsAmount, givesAmount, getsToken, givesToken, }: {
     getsAmount: any;
     givesAmount: any;
@@ -18,7 +19,13 @@ export declare const postSpread: ({ getsToken, givesToken }: {
     getsToken: any;
     givesToken: any;
 }, tolerance?: number, nOffers?: number, signer?: Signer, amount?: string, uri?: string) => Promise<void>;
-export declare const runMarketMaker: ({ tokenA, tokenB }: {
-    tokenA: any;
-    tokenB: any;
-}, tolerance: number, nOffers: number, signer: Signer, interval: number, side: 'buy' | 'sell' | 'both', uri: any, amount?: string) => Promise<never>;
+export declare class MarketMaker {
+    isStarted: boolean;
+    uri: string;
+    constructor({ uri, isStarted, }: IMarketMaker);
+    stop(): boolean;
+    runMarketMaker({ tokenA, tokenB }: {
+        tokenA: any;
+        tokenB: any;
+    }, tolerance?: number, nOffers?: number, signer?: Signer, interval?: number, side?: 'buy' | 'sell' | 'both', amount?: string): Promise<void>;
+}

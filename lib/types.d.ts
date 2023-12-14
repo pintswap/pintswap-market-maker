@@ -1,4 +1,4 @@
-import { Signer } from "ethers";
+import { Signer, Wallet } from "ethers";
 export type ISpreadConfig = {
     pair: {
         tokenA: string;
@@ -20,4 +20,5 @@ export type IMarketMaker = {
     amount: string;
     price: string;
     signer: Signer;
+    wallet: Wallet;
 };
