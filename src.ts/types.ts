@@ -19,5 +19,4 @@ export type IMarketMaker = {
   amount: string;
   price: string;
   signer: Signer;
-  wallet: Wallet;
 }

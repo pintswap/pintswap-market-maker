@@ -200,7 +200,7 @@ export class MarketMaker {
   constructor({
     uri = URI,
     isStarted = false,
-  }: IMarketMaker) {
+  }: { uri: string; isStarted: boolean; }) {
     Object.assign(this, {
       uri,
       isStarted,
@@ -224,6 +224,10 @@ export class MarketMaker {
     side: 'buy' | 'sell' | 'both' = 'both',
     amount?: string,
   ) {
+    if(this.isStarted) {
+      logger.error('Market Maker already running. Please stop and rerun.')
+      return;
+    }
     this.isStarted = true;
     while (this.isStarted) {
       await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
