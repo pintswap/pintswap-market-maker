@@ -257,6 +257,7 @@ export class MarketMaker {
       await publishOnce(this.uri);
       await timeout(interval);
     }
+    await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
   };
   // TODO: finish
   // public uri: string;
