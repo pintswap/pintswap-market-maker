@@ -18,6 +18,10 @@ export declare const postSpread: ({ getsToken, givesToken }: {
     getsToken: any;
     givesToken: any;
 }, tolerance?: number, nOffers?: number, signer?: Signer, amount?: string, uri?: string) => Promise<void>;
+export declare const postStaticSpread: ({ getsToken, givesToken }: {
+    getsToken: any;
+    givesToken: any;
+}, tolerance: number, startPriceInUsd: number, nOffers?: number, signer?: Signer, amount?: string, uri?: string) => Promise<void>;
 export declare class MarketMaker {
     isStarted: boolean;
     uri: string;
@@ -30,7 +34,7 @@ export declare class MarketMaker {
     staticDca({ tokenA, tokenB }: {
         tokenA: any;
         tokenB: any;
-    }, tolerance?: number, nOffers?: number, signer?: Signer, side?: 'buy' | 'sell' | 'both', amount?: string): Promise<void>;
+    }, startPriceInUsd: number, tolerance?: number, nOffers?: number, signer?: Signer, side?: 'buy' | 'sell' | 'both', amount?: string): Promise<void>;
     stopStaticDca(): Promise<void>;
     stop(): boolean;
     runMarketMaker({ tokenA, tokenB }: {

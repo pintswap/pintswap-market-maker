@@ -196,6 +196,93 @@ export const postSpread = async (
   logger.info("-- spread posted --");
 };
 
+export const postStaticSpread = async (
+  { getsToken, givesToken },
+  tolerance: number = 0.08,
+  startPriceInUsd: number,
+  nOffers: number = 5,
+  signer: Signer = SIGNER,
+  amount?: string,
+  uri = URI
+) => {
+  const givesTokenPrice = startPriceInUsd;
+  const getsTokenPrice = await getFairValue(getsToken, signer);
+
+
+  const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
+    [getsToken, givesToken].map(async (v) =>
+      new ethers.Contract(
+        await coerceToWeth(v, signer),
+        ["function decimals() view returns (uint8)"],
+        signer,
+      ).decimals(),
+    ),
+  );
+  
+  let maxOfferAmount: BigNumberish;
+  if(amount) {
+    if(givesToken === ethers.ZeroAddress) {
+      maxOfferAmount = ethers.parseEther(amount);
+    } else {
+      const decimals = await new ethers.Contract(
+        givesToken,
+        ['function decimals() view returns (uint8)'],
+        signer,
+      ).decimals();
+      maxOfferAmount = ethers.parseUnits(amount, decimals);
+    }
+  } else {
+    const givesTokenBalance =
+    givesToken === ethers.ZeroAddress
+      ? await signer.provider.getBalance(await signer.getAddress())
+      : await new ethers.Contract(
+          givesToken,
+          ["function balanceOf(address) view returns (uint256)"],
+          signer,
+        ).balanceOf(await signer.getAddress());
+    maxOfferAmount = givesTokenBalance;
+  }
+
+  const priceMultipliers = Array(Number(nOffers) + 1)
+    .fill(0)
+    .map((_, i) => 1 + i * (Number(tolerance) / Number(nOffers)))
+    .slice(1);
+
+  const offersToInsert = priceMultipliers
+    .map((v) => Math.pow(v - 1, 2))
+    .map(
+      (() => {
+        let sum;
+        return (v, i, ary) => {
+          if (!sum) sum = ary.reduce((r, v) => r + v, 0);
+          return v / sum;
+        };
+      })(),
+    )
+    .map((v, i) => {
+      return {
+        givesToken,
+        givesAmount: toHex(v * Number(maxOfferAmount)),
+        getsToken,
+        getsAmount: toHex(
+          (v *
+            Number(maxOfferAmount) *
+            priceMultipliers[i] *
+            Number(givesTokenPrice) *
+            Math.pow(10, Number(getsTokenDecimals))) /
+            (Math.pow(10, Number(givesTokenDecimals)) * Number(getsTokenPrice)),
+        ),
+      };
+    });
+
+  logger.info("-- posting spread --");
+  for (const item of offersToInsert) {
+    logger.info(item);
+    await add(item, uri);
+  }
+  logger.info("-- spread posted --");
+};
+
 export class MarketMaker {
   public isStarted: boolean;
   public uri: string;
@@ -214,7 +301,8 @@ export class MarketMaker {
 
   async staticDca (
     { tokenA, tokenB }, 
-    tolerance: number = 0.08, 
+    startPriceInUsd: number, 
+    tolerance: number = 0.08,
     nOffers: number = 5, 
     signer: Signer = SIGNER,
     side: 'buy' | 'sell' | 'both' = 'both',
@@ -223,9 +311,10 @@ export class MarketMaker {
     this.dcaTokenA = tokenA;
     this.dcaTokenB = tokenB;
     if(side === 'buy' || side === 'both') {
-      await postSpread(
+      await postStaticSpread(
         { getsToken: tokenA, givesToken: tokenB },
         tolerance,
+        startPriceInUsd,
         nOffers,
         signer,
         amount,
@@ -234,13 +323,15 @@ export class MarketMaker {
     }
 
     if(side === 'sell' || side === 'both') {
-      await postSpread(
+      await postStaticSpread(
         { getsToken: tokenB, givesToken: tokenA },
         tolerance,
+        startPriceInUsd,
         nOffers,
         signer,
         amount,
         this.uri
+
       );
     }
 
