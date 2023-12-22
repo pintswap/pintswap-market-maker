@@ -21,10 +21,17 @@ export declare const postSpread: ({ getsToken, givesToken }: {
 export declare class MarketMaker {
     isStarted: boolean;
     uri: string;
+    dcaTokenA: string;
+    dcaTokenB: string;
     constructor({ uri, isStarted, }: {
         uri: string;
         isStarted: boolean;
     });
+    staticDca({ tokenA, tokenB }: {
+        tokenA: any;
+        tokenB: any;
+    }, tolerance?: number, nOffers?: number, signer?: Signer, side?: 'buy' | 'sell' | 'both', amount?: string): Promise<void>;
+    stopStaticDca(): Promise<void>;
     stop(): boolean;
     runMarketMaker({ tokenA, tokenB }: {
         tokenA: any;

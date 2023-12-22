@@ -77,7 +77,7 @@ export const clearOrderbookForPair = async ({
 }, uri) => {
   const offerList = await offers(uri);
   logger.info("deleting " + offerList.length + " orders");
-  const [gets, gives] = [getsToken, givesToken].map((v) => v.toLowerCase());
+  const [gets, gives] = [getsToken, givesToken].map((v) => v?.toLowerCase());
   const filtered = offerList
     .filter(
       (v) =>
@@ -94,6 +94,7 @@ export const clearOrderbookForPair = async ({
 };
 
 export const getFairValue = async (token, providerOrSigner) => {
+  
   if (ethers.getAddress(token) === USDC_ADDRESS) return BigInt(1000000);
   if (token === ethers.ZeroAddress)
     token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
@@ -118,6 +119,8 @@ export const postSpread = async (
   const [getsTokenPrice, givesTokenPrice] = await Promise.all(
     [getsToken, givesToken].map(async (v) => getFairValue(v, signer)),
   );
+
+
 
   const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
     [getsToken, givesToken].map(async (v) =>
@@ -196,6 +199,8 @@ export const postSpread = async (
 export class MarketMaker {
   public isStarted: boolean;
   public uri: string;
+  public dcaTokenA: string;
+  public dcaTokenB: string;
 
   constructor({
     uri = URI,
@@ -205,6 +210,47 @@ export class MarketMaker {
       uri,
       isStarted,
     });
+  }
+
+  async staticDca (
+    { tokenA, tokenB }, 
+    tolerance: number = 0.08, 
+    nOffers: number = 5, 
+    signer: Signer = SIGNER,
+    side: 'buy' | 'sell' | 'both' = 'both',
+    amount?: string,
+  ){
+    this.dcaTokenA = tokenA;
+    this.dcaTokenB = tokenB;
+    if(side === 'buy' || side === 'both') {
+      await postSpread(
+        { getsToken: tokenA, givesToken: tokenB },
+        tolerance,
+        nOffers,
+        signer,
+        amount,
+        this.uri
+      );
+    }
+
+    if(side === 'sell' || side === 'both') {
+      await postSpread(
+        { getsToken: tokenB, givesToken: tokenA },
+        tolerance,
+        nOffers,
+        signer,
+        amount,
+        this.uri
+      );
+    }
+
+    await publishOnce(this.uri);
+  }
+
+  async stopStaticDca(){
+    const tokenA = this.dcaTokenA;
+    const tokenB = this.dcaTokenB;
+    await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
   }
 
   stop() {
