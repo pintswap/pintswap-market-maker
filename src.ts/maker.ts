@@ -205,7 +205,7 @@ export const postStaticSpread = async (
   amount?: string,
   uri = URI
 ) => {
-  const givesTokenPrice = startPriceInUsd;
+  const givesTokenPrice = BigInt(ethers.parseUnits(Number(startPriceInUsd).toFixed(6), 6));
   const getsTokenPrice = await getFairValue(getsToken, signer);
 
 
