@@ -1,46 +1,24 @@
-import { ethers } from "ethers";
-import path from "path";
-import url from "url";
+import { BigNumberish, Signer, ethers } from "ethers";
 import { getLogger } from "./logger";
 import { toWETH } from "@pintswap/sdk/lib/trade";
-import qs from "querystring";
-import { HttpProxyAgent } from "http-proxy-agent";
-import { ChainId, Token, WETH, Fetcher, Route } from "@uniswap/sdk";
+import { TIMEOUT_MS, USDC_ADDRESS, coerceToWeth, proxyFetch, timeout, toHex, toProvider } from "./utils";
+import { SIGNER, URI } from "./env";
+import { IMarketMakerMethodConfig } from "./types";
+import { providerFromChainId } from "@pintswap/sdk";
 
 const fetch = (global as any).fetch;
 
 const logger = getLogger();
-
-const PORT = process.env.PINTSWAP_DAEMON_PORT || 42161;
-const HOST = process.env.PINTSWAP_DAEMON_HOST || "127.0.0.1";
-
-const agent = process.env.PINTSWAP_MARKET_MAKER_PROXY
-  ? new HttpProxyAgent(process.env.PINTSWAP_MARKET_MAKER_PROXY)
-  : null;
-
-const coerceToWeth = async (address, providerOrSigner) => {
-  if (address === ethers.ZeroAddress) {
-    const { chainId } = await toProvider(providerOrSigner).getNetwork();
-    return toWETH(chainId);
-  }
-  return address;
-};
-
-const URI = url.format({
-  protocol: "http:",
-  hostname: HOST,
-  port: PORT,
-});
 
 export const add = async ({
   getsAmount,
   givesAmount,
   getsToken,
   givesToken,
-}) => {
+}, uri = URI) => {
   logger.info("adding order");
   return (
-    await fetch(URI + "/add", {
+    await fetch(uri + "/add", {
       method: "POST",
       body: JSON.stringify({
         getsAmount,
@@ -55,8 +33,8 @@ export const add = async ({
   ).json();
 };
 
-async function publishOnce() {
-  return await fetch(URI + "/publish-once", {
+async function publishOnce(uri = URI) {
+  return await fetch(uri + "/publish-once", {
     method: "POST",
     body: JSON.stringify({}),
     headers: {
@@ -65,10 +43,10 @@ async function publishOnce() {
   });
 }
 
-export const offers = async () => {
+export const offers = async (uri = URI) => {
   return (
     await (
-      await fetch(URI + "/offers", {
+      await fetch(uri + "/offers", {
         method: "POST",
         body: JSON.stringify({}),
         headers: {
@@ -79,9 +57,9 @@ export const offers = async () => {
   ).result;
 };
 
-export const deleteOffer = async ({ id }) => {
+export const deleteOffer = async ({ id }, uri = URI) => {
   return (
-    await fetch(URI + "/delete", {
+    await fetch(uri + "/delete", {
       method: "POST",
       body: JSON.stringify({
         id,
@@ -96,10 +74,10 @@ export const deleteOffer = async ({ id }) => {
 export const clearOrderbookForPair = async ({
   tokenA: getsToken,
   tokenB: givesToken,
-}) => {
-  const offerList = await offers();
+}, uri) => {
+  const offerList = await offers(uri);
   logger.info("deleting " + offerList.length + " orders");
-  const [gets, gives] = [getsToken, givesToken].map((v) => v.toLowerCase());
+  const [gets, gives] = [getsToken, givesToken].map((v) => v?.toLowerCase());
   const filtered = offerList
     .filter(
       (v) =>
@@ -110,28 +88,13 @@ export const clearOrderbookForPair = async ({
     )
     .map((v) => v.id);
   for (const id of filtered) {
-    await deleteOffer({ id });
+    await deleteOffer({ id }, uri);
   }
   logger.info("done");
 };
 
-const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-
-export const toProvider = (providerOrSigner) => {
-  if (providerOrSigner.sendTransaction && providerOrSigner.getAddress)
-    return providerOrSigner.provider;
-  return providerOrSigner;
-};
-
-export const proxyFetch = async (uri, config?) => {
-  config = (config && { ...config }) || { method: "GET" };
-  config.agent = agent || null;
-  return await fetch(uri, config);
-};
-
-export const ln = (v) => (console.log(v), v);
-
 export const getFairValue = async (token, providerOrSigner) => {
+  
   if (ethers.getAddress(token) === USDC_ADDRESS) return BigInt(1000000);
   if (token === ethers.ZeroAddress)
     token = toWETH((await toProvider(providerOrSigner).getNetwork()).chainId);
@@ -145,19 +108,20 @@ export const getFairValue = async (token, providerOrSigner) => {
   return BigInt(ethers.parseUnits(Number(priceUsd).toFixed(6), 6));
 };
 
-export const toHex = (n: number) => {
-  return ethers.toBeHex(ethers.getUint(BigInt(Number(Number(n).toFixed(0)))));
-};
-
 export const postSpread = async (
   { getsToken, givesToken },
-  tolerance,
-  nOffers,
-  signer,
+  tolerance: number = 0.08,
+  nOffers: number = 5,
+  signer: Signer = SIGNER,
+  amount?: string,
+  uri = URI
 ) => {
   const [getsTokenPrice, givesTokenPrice] = await Promise.all(
     [getsToken, givesToken].map(async (v) => getFairValue(v, signer)),
   );
+
+
+
   const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
     [getsToken, givesToken].map(async (v) =>
       new ethers.Contract(
@@ -167,7 +131,21 @@ export const postSpread = async (
       ).decimals(),
     ),
   );
-  const givesTokenBalance =
+  
+  let maxOfferAmount: BigNumberish;
+  if(amount) {
+    if(givesToken === ethers.ZeroAddress) {
+      maxOfferAmount = ethers.parseEther(amount);
+    } else {
+      const decimals = await new ethers.Contract(
+        givesToken,
+        ['function decimals() view returns (uint8)'],
+        signer,
+      ).decimals();
+      maxOfferAmount = ethers.parseUnits(amount, decimals);
+    }
+  } else {
+    const givesTokenBalance =
     givesToken === ethers.ZeroAddress
       ? await signer.provider.getBalance(await signer.getAddress())
       : await new ethers.Contract(
@@ -175,10 +153,14 @@ export const postSpread = async (
           ["function balanceOf(address) view returns (uint256)"],
           signer,
         ).balanceOf(await signer.getAddress());
+    maxOfferAmount = givesTokenBalance;
+  }
+
   const priceMultipliers = Array(Number(nOffers) + 1)
     .fill(0)
     .map((_, i) => 1 + i * (Number(tolerance) / Number(nOffers)))
     .slice(1);
+
   const offersToInsert = priceMultipliers
     .map((v) => Math.pow(v - 1, 2))
     .map(
@@ -193,11 +175,11 @@ export const postSpread = async (
     .map((v, i) => {
       return {
         givesToken,
-        givesAmount: toHex(v * Number(givesTokenBalance)),
+        givesAmount: toHex(v * Number(maxOfferAmount)),
         getsToken,
         getsAmount: toHex(
           (v *
-            Number(givesTokenBalance) *
+            Number(maxOfferAmount) *
             priceMultipliers[i] *
             Number(givesTokenPrice) *
             Math.pow(10, Number(getsTokenDecimals))) /
@@ -205,43 +187,325 @@ export const postSpread = async (
         ),
       };
     });
-  logger.info("posting spread --");
+
+  logger.info("-- posting spread --");
   for (const item of offersToInsert) {
     logger.info(item);
-    await add(item);
+    await add(item, uri);
   }
-  logger.info("spread posted!");
+  logger.info("-- spread posted --");
 };
 
-const LLAMA_NODES_KEY =
-  process.env.PROCESS_APP_LLAMA_NODES_KEY || "01HDHGP0YXWDYKRT37QQBDGST5";
-// const provider = new ethers.JsonRpcProvider(`https://eth.llamarpc.com/rpc/${LLAMA_NODES_KEY}`);
-// const provider = new ethers.AlchemyProvider(`mainnet`, `KsA01_UT0zpC1_F11oCf25sblF1ZCVdb`);
-const provider = new ethers.InfuraProvider('mainnet', '1efb74c6a48c478298a1b2d68ad4532d');
-const signer = new ethers.Wallet(process.env.PINTSWAP_DAEMON_WALLET).connect(provider);
+export const postStaticSpread = async (
+  { getsToken, givesToken },
+  tolerance: number = 0.08,
+  startPriceInUsd: number,
+  nOffers: number = 5,
+  signer: Signer = SIGNER,
+  amount?: string,
+  uri = URI
+) => {
+  const givesTokenPrice = BigInt(ethers.parseUnits(Number(startPriceInUsd).toFixed(6), 6));
+  const getsTokenPrice = await getFairValue(getsToken, signer);
 
-const TIMEOUT_MS = 300e3;
-
-const timeout = async (n) => {
-  await new Promise((resolve) => setTimeout(resolve, n));
-};
-
-export const runMarketMaker = async ({ tokenA, tokenB }) => {
-  while (true) {
-    await clearOrderbookForPair({ tokenA, tokenB });
-    await postSpread(
-      { getsToken: tokenA, givesToken: tokenB },
-      0.08,
-      5,
-      signer,
-    );
-    await postSpread(
-      { getsToken: tokenB, givesToken: tokenA },
-      0.08,
-      5,
-      signer,
-    );
-    await publishOnce();
-    await timeout(TIMEOUT_MS);
+  const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
+    [getsToken, givesToken].map(async (v) =>
+      new ethers.Contract(
+        await coerceToWeth(v, signer),
+        ["function decimals() view returns (uint8)"],
+        signer,
+      ).decimals(),
+    ),
+  );
+  
+  let maxOfferAmount: BigNumberish;
+  if(amount) {
+    if(givesToken === ethers.ZeroAddress) {
+      maxOfferAmount = ethers.parseEther(amount);
+    } else {
+      const decimals = await new ethers.Contract(
+        givesToken,
+        ['function decimals() view returns (uint8)'],
+        signer,
+      ).decimals();
+      maxOfferAmount = ethers.parseUnits(amount, decimals);
+    }
+  } else {
+    const givesTokenBalance =
+    givesToken === ethers.ZeroAddress
+      ? await signer.provider.getBalance(await signer.getAddress())
+      : await new ethers.Contract(
+          givesToken,
+          ["function balanceOf(address) view returns (uint256)"],
+          signer,
+        ).balanceOf(await signer.getAddress());
+    maxOfferAmount = givesTokenBalance;
   }
+
+  const priceMultipliers = Array(Number(nOffers) + 1)
+    .fill(0)
+    .map((_, i) => 1 + i * (Number(tolerance) / Number(nOffers)))
+    .slice(1);
+
+  const offersToInsert = priceMultipliers
+    .map((v) => Math.pow(v - 1, 2))
+    .map(
+      (() => {
+        let sum;
+        return (v, i, ary) => {
+          if (!sum) sum = ary.reduce((r, v) => r + v, 0);
+          return v / sum;
+        };
+      })(),
+    )
+    .map((v, i) => {
+      return {
+        givesToken,
+        givesAmount: toHex(v * Number(maxOfferAmount)),
+        getsToken,
+        getsAmount: toHex(
+          (v *
+            Number(maxOfferAmount) *
+            priceMultipliers[i] *
+            Number(givesTokenPrice) *
+            Math.pow(10, Number(getsTokenDecimals))) /
+            (Math.pow(10, Number(givesTokenDecimals)) * Number(getsTokenPrice)),
+        ),
+      };
+    });
+
+  logger.info("-- posting spread --");
+  for (const item of offersToInsert) {
+    logger.info(item);
+    await add(item, uri);
+  }
+  logger.info("-- spread posted --");
 };
+
+export async function ensureChainId(chainId: number, signer: Signer) {
+  // Ensure chain id is correct
+  const network = await signer.provider.getNetwork();
+  if(chainId !== 1 || network.chainId !== BigInt(chainId)) {
+    signer.connect(providerFromChainId(chainId) as any);
+  }
+  // Set class var
+  this.chainId = chainId;
+}
+
+export class MarketMaker {
+  public isStarted: boolean;
+  public uri: string;
+  public dcaTokenA: string;
+  public dcaTokenB: string;
+  public chainId: number;
+
+  constructor({
+    uri = URI,
+    isStarted = false,
+    chainId = 1,
+  }: { uri: string; isStarted: boolean; chainId: number; }) {
+    Object.assign(this, {
+      uri,
+      isStarted,
+      chainId
+    });
+  }
+
+  async staticDca ({
+    tokens, 
+    startPriceInUsd, 
+    tolerance = 0.08,
+    nOffers = 5, 
+    signer = SIGNER,
+    side = 'both',
+    amount,
+    chainId
+  } : IMarketMakerMethodConfig){
+    const { tokenA, tokenB } = tokens;
+    this.dcaTokenA = tokenA;
+    this.dcaTokenB = tokenB;
+    await ensureChainId(chainId, signer)
+    if(side === 'buy' || side === 'both') {
+      await postStaticSpread(
+        { getsToken: tokenA, givesToken: tokenB },
+        tolerance,
+        startPriceInUsd,
+        nOffers,
+        signer,
+        amount,
+        this.uri
+      );
+    }
+
+    if(side === 'sell' || side === 'both') {
+      await postStaticSpread(
+        { getsToken: tokenB, givesToken: tokenA },
+        tolerance,
+        startPriceInUsd,
+        nOffers,
+        signer,
+        amount,
+        this.uri
+
+      );
+    }
+
+    await publishOnce(this.uri);
+  }
+
+  async stopStaticDca(){
+    const tokenA = this.dcaTokenA;
+    const tokenB = this.dcaTokenB;
+    await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
+  }
+
+  stop() {
+    if(!this.isStarted) {
+      logger.info('Market Maker not started.')
+      return
+    };
+    return this.isStarted = false;
+  }
+
+  async runMarketMaker ({
+    tokens, 
+    tolerance = 0.08, 
+    nOffers = 5, 
+    signer = SIGNER,
+    interval = TIMEOUT_MS,
+    side = 'both',
+    amount,
+    chainId
+  } : IMarketMakerMethodConfig) {
+    // Check if started
+    if(this.isStarted) {
+      logger.error('Market Maker already running. Please stop and rerun.')
+      return;
+    }
+    
+    // Set chain id if necessary
+    await ensureChainId(chainId, signer)
+
+    // Start process
+    this.isStarted = true;
+    const { tokenA, tokenB } = tokens;
+    while (this.isStarted) {
+      await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
+  
+      if(side === 'buy' || side === 'both') {
+        await postSpread(
+          { getsToken: tokenA, givesToken: tokenB },
+          tolerance,
+          nOffers,
+          signer,
+          amount,
+          this.uri
+        );
+      }
+  
+      if(side === 'sell' || side === 'both') {
+        await postSpread(
+          { getsToken: tokenB, givesToken: tokenA },
+          tolerance,
+          nOffers,
+          signer,
+          amount,
+          this.uri
+        );
+      }
+  
+      await publishOnce(this.uri);
+      await timeout(interval);
+    }
+    await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
+  };
+
+  // TODO: finish
+  // public uri: string;
+  // public isStarted: boolean;
+  // public side: 'sell' | 'buy' | 'both';
+  // public tokenA: string;
+  // public tokenB: string;
+  // public numberOfOffers: number;
+  // public tolerance: number;
+  // public interval: number;
+  // public amount: string;
+  // public price: string;
+  // public signer: Signer;
+  // public pintswap: Pintswap;
+  // public logger: ReturnType<typeof createLogger>;
+
+  // constructor({
+  //   uri = URI,
+  //   isStarted = false,
+  //   side = 'both',
+  //   tokenA,
+  //   tokenB,
+  //   numberOfOffers = 5,
+  //   tolerance = 0.08,
+  //   interval = TIMEOUT_MS,
+  //   amount,
+  //   price,
+  //   signer = SIGNER,
+  // }: IMarketMaker) {
+  //   this.logger = logger;
+  //   Object.assign(this, {
+  //     uri,
+  //     isStarted,
+  //     side,
+  //     tokenA,
+  //     tokenB,
+  //     numberOfOffers,
+  //     tolerance,
+  //     interval,
+  //     amount,
+  //     price,
+  //     signer,
+  //   });
+  // }
+
+  // async setSigner(signer: Signer) {
+
+  // }
+
+  // getSigner() {
+  //   return this.signer;
+  // }
+
+  // async setInterval(_interval: number) {
+
+  // }
+
+  // async setPair(tokenA: string, tokenB: string) {
+  //   if(!isAddress(tokenA)) {
+  //     this.logger.error('Token A is not an appropriate address.');
+  //     return;
+  //   }
+  //   if(!isAddress(tokenB)) {
+  //     this.logger.error('Token B is not an appropriate address.');
+  //     return;
+  //   }
+  //   this.tokenA = getAddress(tokenA);
+  //   this.tokenB = getAddress(tokenB);
+  // }
+
+  // getPair() {
+  //   return [this.tokenA, this.tokenB];
+  // }
+
+  // run() {
+  //   if(this.isStarted) {
+  //     this.logger.info('Market Maker already started.')
+  //     return;
+  //   };
+  //   return this.isStarted = true;
+  // }
+
+  // stop() {
+  //   if(!this.isStarted) {
+  //     this.logger.info('Market Maker not started.')
+  //     return
+  //   };
+  //   return this.isStarted = false;
+  // }
+}
