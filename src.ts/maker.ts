@@ -1,10 +1,10 @@
-import { BigNumberish, Signer, Wallet, ethers, getAddress, isAddress } from "ethers";
-import { createLogger, getLogger } from "./logger";
+import { BigNumberish, Signer, ethers } from "ethers";
+import { getLogger } from "./logger";
 import { toWETH } from "@pintswap/sdk/lib/trade";
 import { TIMEOUT_MS, USDC_ADDRESS, coerceToWeth, proxyFetch, timeout, toHex, toProvider } from "./utils";
 import { SIGNER, URI } from "./env";
-import { IMarketMaker } from "./types";
-import { Pintswap } from "@pintswap/sdk";
+import { IMarketMakerMethodConfig } from "./types";
+import { providerFromChainId } from "@pintswap/sdk";
 
 const fetch = (global as any).fetch;
 
@@ -208,7 +208,6 @@ export const postStaticSpread = async (
   const givesTokenPrice = BigInt(ethers.parseUnits(Number(startPriceInUsd).toFixed(6), 6));
   const getsTokenPrice = await getFairValue(getsToken, signer);
 
-
   const [getsTokenDecimals, givesTokenDecimals] = await Promise.all(
     [getsToken, givesToken].map(async (v) =>
       new ethers.Contract(
@@ -283,33 +282,49 @@ export const postStaticSpread = async (
   logger.info("-- spread posted --");
 };
 
+export async function ensureChainId(chainId: number, signer: Signer) {
+  // Ensure chain id is correct
+  const network = await signer.provider.getNetwork();
+  if(chainId !== 1 || network.chainId !== BigInt(chainId)) {
+    signer.connect(providerFromChainId(chainId) as any);
+  }
+  // Set class var
+  this.chainId = chainId;
+}
+
 export class MarketMaker {
   public isStarted: boolean;
   public uri: string;
   public dcaTokenA: string;
   public dcaTokenB: string;
+  public chainId: number;
 
   constructor({
     uri = URI,
     isStarted = false,
-  }: { uri: string; isStarted: boolean; }) {
+    chainId = 1,
+  }: { uri: string; isStarted: boolean; chainId: number; }) {
     Object.assign(this, {
       uri,
       isStarted,
+      chainId
     });
   }
 
-  async staticDca (
-    { tokenA, tokenB }, 
-    startPriceInUsd: number, 
-    tolerance: number = 0.08,
-    nOffers: number = 5, 
-    signer: Signer = SIGNER,
-    side: 'buy' | 'sell' | 'both' = 'both',
-    amount?: string,
-  ){
+  async staticDca ({
+    tokens, 
+    startPriceInUsd, 
+    tolerance = 0.08,
+    nOffers = 5, 
+    signer = SIGNER,
+    side = 'both',
+    amount,
+    chainId
+  } : IMarketMakerMethodConfig){
+    const { tokenA, tokenB } = tokens;
     this.dcaTokenA = tokenA;
     this.dcaTokenB = tokenB;
+    await ensureChainId(chainId, signer)
     if(side === 'buy' || side === 'both') {
       await postStaticSpread(
         { getsToken: tokenA, givesToken: tokenB },
@@ -352,20 +367,28 @@ export class MarketMaker {
     return this.isStarted = false;
   }
 
-  async runMarketMaker (
-    { tokenA, tokenB }, 
-    tolerance: number = 0.08, 
-    nOffers: number = 5, 
-    signer: Signer = SIGNER,
-    interval: number = TIMEOUT_MS,
-    side: 'buy' | 'sell' | 'both' = 'both',
-    amount?: string,
-  ) {
+  async runMarketMaker ({
+    tokens, 
+    tolerance = 0.08, 
+    nOffers = 5, 
+    signer = SIGNER,
+    interval = TIMEOUT_MS,
+    side = 'both',
+    amount,
+    chainId
+  } : IMarketMakerMethodConfig) {
+    // Check if started
     if(this.isStarted) {
       logger.error('Market Maker already running. Please stop and rerun.')
       return;
     }
+    
+    // Set chain id if necessary
+    await ensureChainId(chainId, signer)
+
+    // Start process
     this.isStarted = true;
+    const { tokenA, tokenB } = tokens;
     while (this.isStarted) {
       await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
   
@@ -396,6 +419,7 @@ export class MarketMaker {
     }
     await clearOrderbookForPair({ tokenA, tokenB }, this.uri);
   };
+
   // TODO: finish
   // public uri: string;
   // public isStarted: boolean;

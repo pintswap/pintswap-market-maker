@@ -21,3 +21,17 @@ export type IMarketMaker = {
     price: string;
     signer: Signer;
 };
+export type IMarketMakerMethodConfig = {
+    tokens: {
+        tokenA: string;
+        tokenB: string;
+    };
+    tolerance?: number;
+    nOffers?: number;
+    signer?: Signer;
+    interval?: number;
+    side?: 'buy' | 'sell' | 'both';
+    amount?: string;
+    chainId?: number;
+    startPriceInUsd?: number;
+};

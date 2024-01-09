@@ -1,4 +1,5 @@
 import { Signer } from "ethers";
+import { IMarketMakerMethodConfig } from "./types";
 export declare const add: ({ getsAmount, givesAmount, getsToken, givesToken, }: {
     getsAmount: any;
     givesAmount: any;
@@ -22,23 +23,20 @@ export declare const postStaticSpread: ({ getsToken, givesToken }: {
     getsToken: any;
     givesToken: any;
 }, tolerance: number, startPriceInUsd: number, nOffers?: number, signer?: Signer, amount?: string, uri?: string) => Promise<void>;
+export declare function ensureChainId(chainId: number, signer: Signer): Promise<void>;
 export declare class MarketMaker {
     isStarted: boolean;
     uri: string;
     dcaTokenA: string;
     dcaTokenB: string;
-    constructor({ uri, isStarted, }: {
+    chainId: number;
+    constructor({ uri, isStarted, chainId, }: {
         uri: string;
         isStarted: boolean;
+        chainId: number;
     });
-    staticDca({ tokenA, tokenB }: {
-        tokenA: any;
-        tokenB: any;
-    }, startPriceInUsd: number, tolerance?: number, nOffers?: number, signer?: Signer, side?: 'buy' | 'sell' | 'both', amount?: string): Promise<void>;
+    staticDca({ tokens, startPriceInUsd, tolerance, nOffers, signer, side, amount, chainId }: IMarketMakerMethodConfig): Promise<void>;
     stopStaticDca(): Promise<void>;
     stop(): boolean;
-    runMarketMaker({ tokenA, tokenB }: {
-        tokenA: any;
-        tokenB: any;
-    }, tolerance?: number, nOffers?: number, signer?: Signer, interval?: number, side?: 'buy' | 'sell' | 'both', amount?: string): Promise<void>;
+    runMarketMaker({ tokens, tolerance, nOffers, signer, interval, side, amount, chainId }: IMarketMakerMethodConfig): Promise<void>;
 }
